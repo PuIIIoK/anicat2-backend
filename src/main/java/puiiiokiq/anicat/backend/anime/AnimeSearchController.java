@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -21,17 +22,26 @@ public class AnimeSearchController {
             return ResponseEntity.badRequest().body("Введите название аниме, которое хотите найти");
         }
 
-        String[] queryWords = query.trim().toLowerCase(Locale.ROOT).split("\\s+");
+        // Подготовка: разбиваем строку, фильтруем короткие слова
+        String[] queryWords = Arrays.stream(query.trim().toLowerCase(Locale.ROOT).split("\\s+"))
+                .filter(word -> word.length() >= 3) // ⬅️ ищем только по словам длиной 3+ символа
+                .toArray(String[]::new);
+
+        if (queryWords.length == 0) {
+            return ResponseEntity.badRequest().body("Введите более осмысленный запрос (от 3 символов)");
+        }
 
         List<Anime> results = animeRepository.findAll().stream()
                 .filter(anime -> {
-                    String title = anime.getTitle().toLowerCase(Locale.ROOT);
-                    String altTitle = anime.getAlttitle().toLowerCase(Locale.ROOT);
+                    String title = anime.getTitle() != null ? anime.getTitle().toLowerCase(Locale.ROOT) : "";
+                    String altTitle = anime.getAlttitle() != null ? anime.getAlttitle().toLowerCase(Locale.ROOT) : "";
 
-                    // Проверяем, что хотя бы одно слово из запроса содержится полностью
+                    // Ищем совпадение по словам (точное вхождение)
                     for (String word : queryWords) {
-                        if (title.contains(" " + word + " ") || title.startsWith(word + " ") || title.endsWith(" " + word)
-                                || altTitle.contains(" " + word + " ") || altTitle.startsWith(word + " ") || altTitle.endsWith(" " + word)) {
+                        List<String> titleWords = Arrays.asList(title.split("\\s+"));
+                        List<String> altWords = Arrays.asList(altTitle.split("\\s+"));
+
+                        if (titleWords.contains(word) || altWords.contains(word)) {
                             return true;
                         }
                     }
@@ -42,4 +52,5 @@ public class AnimeSearchController {
 
         return ResponseEntity.ok(results);
     }
+
 }

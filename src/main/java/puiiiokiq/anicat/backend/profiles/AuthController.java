@@ -1,20 +1,31 @@
 package puiiiokiq.anicat.backend.profiles;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
+
+
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
+
     private final AuthService authService;
     private final UserRepository userRepository;
-    private final ProfileRepository profileRepository; // ← добавь это
+    private final ProfileRepository profileRepository;
     private final PasswordEncoder passwordEncoder;
 
     @PostMapping("/register")
@@ -28,18 +39,32 @@ public class AuthController {
     }
 
     @GetMapping("/check-auth")
-    public String checkAuth() {
-        return "Пользователь авторизован";
+    public ResponseEntity<String> checkAuth() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal().equals("anonymousUser")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Не авторизован");
+        }
+
+        return ResponseEntity.ok("Пользователь авторизован");
     }
 
+
     @GetMapping("/get-role")
-    public String getRole() {
+    public ResponseEntity<List<String>> getRole() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return auth.getAuthorities().stream()
-                .map(Object::toString)
-                .reduce((r1, r2) -> r1 + "," + r2)
-                .orElse("UNKNOWN");
+        String username = auth.getName();
+
+        return userRepository.findByUsername(username)
+                .map(user -> {
+                    List<String> roleNames = user.getRoles().stream()
+                            .map(Enum::name)
+                            .toList();
+                    return ResponseEntity.ok(roleNames);
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(List.of("UNKNOWN")));
     }
+
 
     @GetMapping("/get-profile")
     public UserProfile getMyProfile(Authentication auth) {
@@ -171,5 +196,71 @@ public class AuthController {
         return ResponseEntity.ok("Логин и/или пароль обновлены по ID.");
     }
 
+    @GetMapping("/check-admin-access")
+    public ResponseEntity<?> checkAdminAccess(HttpServletRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth.getName();
 
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(username)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Не авторизован");
+        }
+
+        return userRepository.findByUsername(username)
+                .map(user -> {
+                    boolean isAdmin = user.getRoles().stream()
+                            .anyMatch(role -> role.name().equals("ADMIN"));
+
+                    if (isAdmin) {
+                        URI redirectUri = URI.create(frontendUrl + "/admin_panel");
+                        return ResponseEntity.status(HttpStatus.FOUND).location(redirectUri).build();
+                    } else {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Нет доступа");
+                    }
+                })
+                .orElse(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Пользователь не найден"));
+    }
+
+    @GetMapping("/user-info")
+    public ResponseEntity<? extends Map<String, ? extends Object>> getUserInfo(HttpServletRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("error", "Не авторизован")
+            );
+        }
+
+        String username = auth.getName();
+
+        return userRepository.findByUsername(username)
+                .map(user -> {
+                    // Только если есть токен в запросе — возвращаем логин и роль
+                    String token = extractTokenFromRequest(request);
+                    if (token.equals("N/A")) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                                Map.of("error", "Токен не найден")
+                        );
+                    }
+
+                    List<String> roles = user.getRoles().stream()
+                            .map(Enum::name)
+                            .toList();
+
+                    return ResponseEntity.ok(Map.of(
+                            "username", user.getUsername(),
+                            "roles", roles
+                    ));
+                })
+                .orElse(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                        Map.of("error", "Пользователь не найден")
+                ));
+    }
+
+    private String extractTokenFromRequest(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7); // удалить "Bearer "
+        }
+        return "N/A";
+    }
 }

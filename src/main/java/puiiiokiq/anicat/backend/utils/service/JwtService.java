@@ -5,6 +5,7 @@ import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -14,8 +15,13 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    private final SecretKey secretKey = Keys.hmacShaKeyFor("super-secret-key-anicat-which-is-very-safe!!".getBytes(StandardCharsets.UTF_8));
+    private final SecretKey secretKey;
+
     private final long EXPIRATION_TIME = 1000 * 60 * 60 * 24; // 24 часа
+
+    public JwtService(@Value("${jwt.secret}") String secret) {
+        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    }
 
     public String generateToken(String username, String role) {
         return Jwts.builder()
@@ -36,8 +42,13 @@ public class JwtService {
     }
 
     private Claims extractAllClaims(String token) {
+        if (token == null || !token.startsWith("ey") || token.chars().filter(ch -> ch == '.').count() != 2) {
+            throw new IllegalArgumentException("Некорректный JWT токен: отсутствует или структура неверна");
+        }
+
         return getParser().parseSignedClaims(token).getPayload();
     }
+
 
     private JwtParser getParser() {
         return Jwts.parser().verifyWith(secretKey).build();

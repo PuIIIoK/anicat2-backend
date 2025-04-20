@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface ScreenshotsRepository extends JpaRepository<Screenshots, Long> {
     List<Screenshots> findByAnimeId(Long animeId);
+    void deleteByAnimeId(Long animeId);
+    boolean existsByAnimeId(Long animeId);
 }

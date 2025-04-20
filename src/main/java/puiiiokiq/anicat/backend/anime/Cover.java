@@ -16,8 +16,9 @@ public class Cover {
 
     private String name; // название обложки, например: cover1.webp
 
-    @ManyToOne
     @JsonBackReference
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "anime_id")
-    private Anime anime; // связь с аниме
+    private Anime anime;
+
 }

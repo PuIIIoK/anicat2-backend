@@ -1,20 +1,16 @@
 package puiiiokiq.anicat.backend.episodes;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import puiiiokiq.anicat.backend.anime.*;
 import puiiiokiq.anicat.backend.utils.service.S3Service;
 
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -56,15 +52,15 @@ public class StreamingController {
             return ResponseEntity.status(404).body("Озвучка с названием '" + audioName + "' не найдена для этого эпизода.");
         }
 
-        String sanitizedAudioName = audioName.toLowerCase().replace(" ", "");
+        String sanitizedAudioName = audioOpt.get().getName().replace(" ", "");
         String s3Key = String.format("animes/%d/episodes/%s/1080/%d.mp4", animeId, sanitizedAudioName, episodeId);
 
         try {
-            if (!s3Service.fileExists("anicat2", s3Key)) {
+            if (!s3Service.fileExists(s3Key)) {
                 return ResponseEntity.status(404).body("Файл не найден в S3-хранилище.");
             }
 
-            URL url = s3Service.generatePresignedUrl("anicat2", s3Key);
+            URL url = s3Service.generatePresignedUrl(s3Key);
             return ResponseEntity.ok(Map.of("url", url.toString()));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Ошибка при получении ссылки на видео.");
@@ -85,11 +81,11 @@ public class StreamingController {
         String s3Key = String.format("animes/%d/cover/%d.webp", animeId, coverId);
 
         try {
-            if (!s3Service.fileExists("anicat2", s3Key)) {
+            if (!s3Service.fileExists(s3Key)) {
                 return ResponseEntity.status(404).body("Обложка не найдена в S3-хранилище.");
             }
 
-            URL url = s3Service.generatePresignedUrl("anicat2", s3Key);
+            URL url = s3Service.generatePresignedUrl(s3Key);
             return ResponseEntity.ok(Map.of("url", url.toString()));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Ошибка при получении обложки.");
@@ -110,16 +106,17 @@ public class StreamingController {
         String s3Key = String.format("animes/%d/screenshots/%d.webp", animeId, screenshotId);
 
         try {
-            if (!s3Service.fileExists("anicat2", s3Key)) {
+            if (!s3Service.fileExists(s3Key)) {
                 return ResponseEntity.status(404).body("Скриншот не найден в S3-хранилище.");
             }
 
-            URL url = s3Service.generatePresignedUrl("anicat2", s3Key);
+            URL url = s3Service.generatePresignedUrl(s3Key);
             return ResponseEntity.ok(Map.of("url", url.toString()));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Ошибка при получении скриншота.");
         }
     }
+
     @GetMapping("/anime/{animeId}/screenshots")
     public ResponseEntity<?> getAllScreenshotsFromS3(@PathVariable Long animeId) {
         if (animeRepository.findById(animeId).isEmpty()) {
@@ -139,14 +136,14 @@ public class StreamingController {
                     .map(screenshot -> {
                         String s3Key = String.format("animes/%d/screenshots/%d.webp", animeId, screenshot.getId());
 
-                        if (!s3Service.fileExists("anicat2", s3Key)) {
+                        if (!s3Service.fileExists(s3Key)) {
                             return Map.of(
                                     "id", String.valueOf(screenshot.getId()),
                                     "status", "not_found"
                             );
                         }
 
-                        URL url = s3Service.generatePresignedUrl("anicat2", s3Key);
+                        URL url = s3Service.generatePresignedUrl(s3Key);
                         return Map.of(
                                 "id", String.valueOf(screenshot.getId()),
                                 "url", url.toString()
@@ -157,6 +154,28 @@ public class StreamingController {
             return ResponseEntity.ok(screenshotLinks);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Ошибка при генерации ссылок на скриншоты.");
+        }
+    }
+
+    @GetMapping("/{animeId}/cover")
+    public ResponseEntity<?> getCover(@PathVariable Long animeId) {
+        List<Cover> covers = coverRepository.findByAnimeId(animeId);
+        if (covers.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Обложка не найдена");
+        }
+
+        Cover cover = covers.get(0);
+        String key = "animes/" + animeId + "/cover/" + cover.getId() + ".webp";
+
+        try {
+            var stream = s3Service.getFileStream(key);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("image/webp"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + cover.getId() + ".webp\"")
+                    .body(new InputStreamResource(stream));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Ошибка загрузки обложки");
         }
     }
 }
