@@ -5,10 +5,8 @@ import org.springframework.http.HttpStatus;
 import puiiiokiq.anicat.backend.utils.service.S3Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -26,11 +24,10 @@ public class S3Controller {
             @PathVariable String id,
             @RequestHeader(value = "Range", required = false) String range
     ) {
-        String bucket = "anicat2";
         String key = "anime/episodes/anilibria/1080p/" + id + ".mp4";
 
         try {
-            ResponseInputStream<GetObjectResponse> s3Stream = s3Service.getFileStream(bucket, key, range);
+            ResponseInputStream<GetObjectResponse> s3Stream = s3Service.getFileStream(key, range);
             GetObjectResponse metadata = s3Stream.response();
 
             long contentLength = metadata.contentLength();
@@ -38,7 +35,6 @@ public class S3Controller {
             headers.set(HttpHeaders.CONTENT_TYPE, "video/mp4");
 
             if (range != null && range.startsWith("bytes=")) {
-                // Пример Range: "bytes=0-1023"
                 String[] ranges = range.replace("bytes=", "").split("-");
                 long start = Long.parseLong(ranges[0]);
                 long end = ranges.length > 1 && !ranges[1].isEmpty() ? Long.parseLong(ranges[1]) : contentLength - 1;

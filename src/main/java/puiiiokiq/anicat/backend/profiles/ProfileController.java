@@ -19,7 +19,6 @@ public class ProfileController {
     private final ProfileRepository profileRepository;
     private final UserRepository userRepository;
 
-    private final String bucketName = "anicat2";
     private final List<String> extensions = List.of("webp", "jpg", "jpeg", "png");
 
     @GetMapping("/get-cover-lk")
@@ -79,8 +78,8 @@ public class ProfileController {
 
         for (String ext : extensions) {
             String s3Key = "profile/static/%s/%s.%s".formatted(type, fileId, ext);
-            if (s3Service.fileExists(bucketName, s3Key)) {
-                URL url = s3Service.generatePresignedUrl(bucketName, s3Key);
+            if (s3Service.fileExists(s3Key)) {
+                URL url = s3Service.generatePresignedUrl(s3Key);
                 return ResponseEntity.ok(Map.of("url", url.toString()));
             }
         }

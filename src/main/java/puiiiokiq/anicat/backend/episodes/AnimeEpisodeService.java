@@ -2,6 +2,10 @@ package puiiiokiq.anicat.backend.episodes;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import puiiiokiq.anicat.backend.episodes.Repository.AudioRepository;
+import puiiiokiq.anicat.backend.episodes.Repository.EpisodeRepository;
+import puiiiokiq.anicat.backend.episodes.models.Audio;
+import puiiiokiq.anicat.backend.episodes.models.Episode;
 
 import java.util.List;
 import java.util.Optional;

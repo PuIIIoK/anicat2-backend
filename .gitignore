@@ -1,0 +1,48 @@
+# 💡 Java
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# 💡 Build
+/target/
+/build/
+
+# 💡 IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# 💡 Maven
+.mvn/
+!**/src/**/mvnw*
+!**/src/**/mvnw.cmd
+
+# 💡 Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# 💡 OS
+.DS_Store
+Thumbs.db
+
+# 💡 Env & конфигурации
+.env
+*.env
+.env.local
+src/main/resources/application.properties
+src/main/resources/application.yml
+
+# 💡 VSCode (если используешь)
+.vscode/
+
+# 💡 Git filter repo backup
+.git-rewrite/
+
+# 💡 Logs
+*.log
+logs/

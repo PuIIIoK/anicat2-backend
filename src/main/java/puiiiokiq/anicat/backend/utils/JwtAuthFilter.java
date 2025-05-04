@@ -16,12 +16,14 @@ import puiiiokiq.anicat.backend.utils.service.JwtService;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.logging.Logger;
 
 @Component
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private static final Logger logger = Logger.getLogger(JwtAuthFilter.class.getName());
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -29,27 +31,34 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
+
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
         String token = authHeader.substring(7);
-        String username = jwtService.extractUsername(token);
-        String role = jwtService.extractRole(token);
+        try {
+            String username = jwtService.extractUsername(token);
+            String role = jwtService.extractRole(token);
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            User userDetails = new User(
-                    username,
-                    "",
-                    Collections.singleton(new SimpleGrantedAuthority("Your_Role_" + role))
-            );
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                User userDetails = new User(
+                        username,
+                        "",
+                        Collections.singleton(new SimpleGrantedAuthority("ROLE_" + role))
+                );
 
-            UsernamePasswordAuthenticationToken authToken =
-                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
 
-            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-            SecurityContextHolder.getContext().setAuthentication(authToken);
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+
+        } catch (Exception e) {
+            logger.warning("❌ Ошибка в JWT токене: " + e.getMessage());
+            // Не блокируем — просто продолжаем цепочку фильтров
         }
 
         filterChain.doFilter(request, response);

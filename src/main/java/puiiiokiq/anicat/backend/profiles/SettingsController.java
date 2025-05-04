@@ -1,18 +1,24 @@
 package puiiiokiq.anicat.backend.profiles;
 
-import lombok.RequiredArgsConstructor;
+import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import puiiiokiq.anicat.backend.utils.service.S3Service;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+
 @RestController
 @RequestMapping("/api/upload")
-@RequiredArgsConstructor
 public class SettingsController {
 
     private final S3Service s3Service;
-    private final String bucketName = "anicat2";
+
+    public SettingsController(S3Service s3Service) {
+        this.s3Service = s3Service;
+    }
 
     @PostMapping("/profile-image")
     public ResponseEntity<?> uploadProfileImage(
@@ -25,19 +31,16 @@ public class SettingsController {
         }
 
         try {
-            String extension = getExtension(file.getOriginalFilename());
-            String s3Key = String.format("profile/static/%s/%s.%s", type, fileId, extension);
+            // Просто задаём новое имя файла с .webp
+            String s3Key = String.format("profile/static/%s/%s.webp", type, fileId);
 
-            s3Service.uploadFile(bucketName, s3Key, file); // <-- Вот тут
+            // Загружаем оригинальный файл без конвертации
+            s3Service.uploadFile(s3Key, file);
 
-            return ResponseEntity.ok().body("Файл успешно загружен: " + s3Key);
+            return ResponseEntity.ok("Файл загружен как .webp: " + s3Key);
         } catch (Exception e) {
+            e.printStackTrace(); // для отладки
             return ResponseEntity.internalServerError().body("Ошибка загрузки: " + e.getMessage());
         }
-    }
-
-    private String getExtension(String filename) {
-        if (filename == null || !filename.contains(".")) return "";
-        return filename.substring(filename.lastIndexOf('.') + 1);
     }
 }

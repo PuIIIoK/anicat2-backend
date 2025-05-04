@@ -3,6 +3,12 @@ package puiiiokiq.anicat.backend.profiles;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import puiiiokiq.anicat.backend.profiles.Repository.UserRepository;
+import puiiiokiq.anicat.backend.profiles.ReqResp.AuthResponse;
+import puiiiokiq.anicat.backend.profiles.ReqResp.LoginRequest;
+import puiiiokiq.anicat.backend.profiles.ReqResp.RegisterRequest;
+import puiiiokiq.anicat.backend.profiles.models.Profile;
+import puiiiokiq.anicat.backend.profiles.models.User;
 import puiiiokiq.anicat.backend.utils.Role;
 import puiiiokiq.anicat.backend.utils.service.JwtService;
 
@@ -34,7 +40,8 @@ public class AuthService {
 
         String token = jwtService.generateToken(
                 user.getUsername(),
-                user.getRoles().stream().map(Enum::name).findFirst().orElse("USER")
+                user.getRoles().stream().map(Enum::name).findFirst().orElse("USER"),
+                user.getId()
         );
         return new AuthResponse(token);
     }
@@ -49,7 +56,8 @@ public class AuthService {
 
         String token = jwtService.generateToken(
                 user.getUsername(),
-                user.getRoles().stream().map(Enum::name).findFirst().orElse("USER")
+                user.getRoles().stream().map(Enum::name).findFirst().orElse("USER"),
+                user.getId()
         );
         return new AuthResponse(token);
     }

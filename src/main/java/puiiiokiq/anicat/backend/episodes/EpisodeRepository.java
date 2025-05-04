@@ -5,4 +5,8 @@ import java.util.List;
 
 public interface EpisodeRepository extends JpaRepository<Episode, Long> {
     List<Episode> findByAnimeId(Long animeId);
+
+    void deleteByAnimeId(Long animeId);
+
+    boolean existsByAnimeId(Long animeId);
 }

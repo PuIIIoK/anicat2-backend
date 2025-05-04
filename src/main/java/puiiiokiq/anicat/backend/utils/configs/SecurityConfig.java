@@ -1,6 +1,7 @@
 package puiiiokiq.anicat.backend.utils.configs;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -23,13 +24,17 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
 
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .cors().and()
                 .csrf().disable()
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/register",
+                        .requestMatchers(
+                                "/api/auth/register",
                                 "/api/auth/login",
                                 "/api/auth/get-profile",
                                 "/api/profile/**",
@@ -45,7 +50,13 @@ public class SecurityConfig {
                                 "/api/auth/set-profile-id/**",
                                 "/api/upload/**",
                                 "/api/auth/set-login/**",
-                                "/api/auth/set-login-id/**").permitAll()
+                                "/api/auth/set-login-id/**",
+                                "/api/admin/**",
+                                "/api/kinescope/**",
+                                "/api/libria/**",
+                                "/api/upload/profile/**",
+                                "/api/profiles/**"
+                        ).permitAll()
                         .requestMatchers("/api/auth/check", "/api/auth/get-role").authenticated()
                         .anyRequest().authenticated()
                 )
@@ -57,7 +68,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3000"));
+        config.setAllowedOrigins(List.of(frontendUrl));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
