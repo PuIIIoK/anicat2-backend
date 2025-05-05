@@ -349,24 +349,38 @@ public class AnimeAdminController {
     ) {
         Anime anime = animeRepository.findById(animeId).orElseThrow();
 
+        // Удаление старой обложки (если есть)
         if (anime.getCover() != null) {
             Long oldId = anime.getCover().getId();
-            s3Service.deleteFile("animes/" + animeId + "/cover/" + oldId + ".webp");
+
+            // 1. Убираем связь с cover
+            anime.setCover(null);
+            animeRepository.save(anime);
+
+            // 2. Удаляем файл из S3
+            String oldKey = "animes/" + animeId + "/cover/" + oldId + ".webp";
+            s3Service.deleteFile(oldKey);
+
+            // 3. Удаляем запись cover из базы
             coverRepository.deleteById(oldId);
         }
 
+        // 4. Создаём новую обложку
         Cover cover = new Cover();
         cover.setAnime(anime);
         coverRepository.save(cover);
 
+        // 5. Загружаем файл в S3
         String newKey = "animes/" + animeId + "/cover/" + cover.getId() + ".webp";
         s3Service.uploadFile(newKey, file);
 
+        // 6. Привязываем обложку к аниме
         anime.setCover(cover);
         animeRepository.save(anime);
 
         return ResponseEntity.ok("✅ Обложка обновлена");
     }
+
 
     @PutMapping("/edit-banner/{animeId}")
     public ResponseEntity<String> editBanner(
@@ -375,41 +389,63 @@ public class AnimeAdminController {
     ) {
         Anime anime = animeRepository.findById(animeId).orElseThrow();
 
+        // Удаление старого баннера (если есть)
         if (anime.getBanner() != null) {
             Long oldId = anime.getBanner().getId();
-            s3Service.deleteFile("animes/" + animeId + "/banner/" + oldId + ".webp");
+
+            // 1. Разрываем связь
+            anime.setBanner(null);
+            animeRepository.save(anime);
+
+            // 2. Удаляем файл из S3
+            String oldKey = "animes/" + animeId + "/banner/" + oldId + ".webp";
+            s3Service.deleteFile(oldKey);
+
+            // 3. Удаляем запись из базы
             bannerRepository.deleteById(oldId);
         }
 
+        // 4. Создаём новый баннер
         Banner banner = new Banner();
         banner.setAnime(anime);
         bannerRepository.save(banner);
 
+        // 5. Загружаем файл в S3
         String key = "animes/" + animeId + "/banner/" + banner.getId() + ".webp";
         s3Service.uploadFile(key, file);
 
+        // 6. Привязываем баннер к аниме
         anime.setBanner(banner);
         animeRepository.save(anime);
 
         return ResponseEntity.ok("✅ Баннер обновлён");
     }
 
+
     @PutMapping("/edit-screenshots/{animeId}")
     public ResponseEntity<String> editScreenshots(
             @PathVariable Long animeId,
-            @RequestParam("files") List<MultipartFile> files
+            @RequestParam("files") List<MultipartFile> newFiles,
+            @RequestParam("keepIds") List<Long> keepIds // <-- Список ID, которые остаются
     ) {
         Anime anime = animeRepository.findById(animeId).orElseThrow();
 
-        // Удалить старые
-        List<Screenshots> oldShots = screenshotsRepository.findByAnimeId(animeId);
-        for (Screenshots shot : oldShots) {
-            s3Service.deleteFile("animes/" + animeId + "/screenshots/" + shot.getId() + ".webp");
-        }
-        screenshotsRepository.deleteAll(oldShots);
+        // Найдём старые скриншоты
+        List<Screenshots> existingShots = screenshotsRepository.findByAnimeId(animeId);
 
-        // Добавить новые
-        for (MultipartFile file : files) {
+        // Вычисляем, какие нужно удалить
+        List<Screenshots> toRemove = existingShots.stream()
+                .filter(s -> !keepIds.contains(s.getId()))
+                .toList();
+
+        for (Screenshots shot : toRemove) {
+            String key = "animes/" + animeId + "/screenshots/" + shot.getId() + ".webp";
+            s3Service.deleteFile(key);
+        }
+        screenshotsRepository.deleteAll(toRemove);
+
+        // Загружаем новые
+        for (MultipartFile file : newFiles) {
             Screenshots shot = new Screenshots();
             shot.setAnime(anime);
             screenshotsRepository.save(shot);
@@ -421,6 +457,52 @@ public class AnimeAdminController {
         return ResponseEntity.ok("✅ Скриншоты обновлены");
     }
 
+
+    @DeleteMapping("/delete-cover/{animeId}")
+    public ResponseEntity<String> deleteCover(@PathVariable Long animeId) {
+        Anime anime = animeRepository.findById(animeId)
+                .orElseThrow(() -> new RuntimeException("Аниме не найдено"));
+
+        if (anime.getCover() != null) {
+            Long coverId = anime.getCover().getId();
+
+            // 1. Убираем связь
+            anime.setCover(null);
+            animeRepository.save(anime);
+
+            // 2. Удаляем файл из S3
+            String key = "animes/" + animeId + "/cover/" + coverId + ".webp";
+            s3Service.deleteFile(key);
+
+            // 3. Удаляем из БД
+            coverRepository.deleteById(coverId);
+        }
+
+        return ResponseEntity.ok("✅ Обложка удалена");
+    }
+
+    @DeleteMapping("/delete-banner/{animeId}")
+    public ResponseEntity<String> deleteBanner(@PathVariable Long animeId) {
+        Anime anime = animeRepository.findById(animeId)
+                .orElseThrow(() -> new RuntimeException("Аниме не найдено"));
+
+        if (anime.getBanner() != null) {
+            Long bannerId = anime.getBanner().getId();
+
+            // 1. Убираем связь
+            anime.setBanner(null);
+            animeRepository.save(anime);
+
+            // 2. Удаляем файл из S3
+            String key = "animes/" + animeId + "/banner/" + bannerId + ".webp";
+            s3Service.deleteFile(key);
+
+            // 3. Удаляем из БД
+            bannerRepository.deleteById(bannerId);
+        }
+
+        return ResponseEntity.ok("✅ Баннер удалён");
+    }
 
 
 }
