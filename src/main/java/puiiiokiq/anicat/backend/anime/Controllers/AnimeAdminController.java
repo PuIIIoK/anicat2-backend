@@ -2,8 +2,11 @@ package puiiiokiq.anicat.backend.anime.Controllers;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import puiiiokiq.anicat.backend.admin.SiteLogService;
 import puiiiokiq.anicat.backend.anime.AnimeInfoRequest;
 import puiiiokiq.anicat.backend.anime.Repository.AnimeRepository;
 import puiiiokiq.anicat.backend.anime.Service.AnimeService;
@@ -28,6 +31,7 @@ import puiiiokiq.anicat.backend.anime.Repository.BannerRepository;
 import puiiiokiq.anicat.backend.anime.Repository.CoverRepository;
 import puiiiokiq.anicat.backend.anime.Repository.ScreenshotsRepository;
 
+
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
@@ -40,45 +44,86 @@ public class AnimeAdminController {
     private final AudioRepository audioRepository;
     private final BannerRepository bannerRepository;
     private final CoverRepository coverRepository;
+    private final SiteLogService logService;
     private final ScreenshotsRepository screenshotsRepository;
 
 
 
-    // 1. СОЗДАНИЕ ПУСТОЙ ЗАПИСИ И ПАПОК
     @PostMapping("/create-anime")
-    public ResponseEntity<Long> createAnimeStructure() {
+    public ResponseEntity<Long> createAnimeStructure(Authentication authentication) {
         Long animeId = animeService.createAnimeAndReturnId();
         s3Service.createAnimeDirectories(animeId);
+
+        // логирование
+        String username = authentication != null ? authentication.getName() : "anonymous";
+        logService.log(
+                "Создание аниме",
+                "Пользователь (" + username + ") создал аниме (ID: " + animeId + ")",
+                username
+        );
+
         return ResponseEntity.ok(animeId);
     }
 
-    // 2. УДАЛЕНИЕ АНИМЕ И ВСЕХ СВЯЗАННЫХ ДАННЫХ
+
     @DeleteMapping("/delete-anime/{animeId}")
-    public ResponseEntity<String> deleteAnime(@PathVariable Long animeId) {
+    public ResponseEntity<String> deleteAnime(
+            @PathVariable Long animeId,
+            Authentication authentication
+    ) {
         animeService.deleteAnimeWithRelations(animeId);
         s3Service.deleteAnimeDirectory(animeId);
+
+        String username = authentication != null ? authentication.getName() : "anonymous";
+        logService.log(
+                "Удаление аниме",
+                "Пользователь (" + username + ") удалил аниме (ID: " + animeId + ")",
+                username
+        );
+
         return ResponseEntity.ok("Аниме и связанные данные удалены");
     }
+
 
     // 3. ЗАГРУЗКА ОБЛОЖКИ
     @PostMapping("/upload-cover/{animeId}")
     public ResponseEntity<String> uploadCover(
             @PathVariable Long animeId,
-            @RequestParam("file") MultipartFile file
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
     ) {
         Long coverId = animeService.createCoverRecord(animeId);
         String newFilename = coverId + ".webp";
         s3Service.uploadFile("animes/" + animeId + "/cover/" + newFilename, file);
+
+        // лог
+        String username = authentication != null ? authentication.getName() : "anonymous";
+        logService.log(
+                "Загрузка обложки",
+                "Пользователь (" + username + ") загрузил обложку (ID: " + coverId + ") для аниме (ID: " + animeId + ")",
+                username
+        );
+
         return ResponseEntity.ok("Обложка загружена");
     }
 
     // 4. ЗАГРУЗКА ИНФОРМАЦИИ О АНИМЕ
     @PostMapping("/upload-info/{animeId}")
     public ResponseEntity<String> uploadAnimeInfo(
-            @PathVariable Long animeId, 
-            @RequestBody AnimeInfoRequest request
+            @PathVariable Long animeId,
+            @RequestBody AnimeInfoRequest request,
+            Authentication authentication
     ) {
         animeService.saveAnimeInfo(animeId, request);
+
+        // лог
+        String username = authentication != null ? authentication.getName() : "anonymous";
+        logService.log(
+                "Загрузка/Сохрание аниме",
+                "Пользователь (" + username + ") обновил информацию о аниме (ID: " + animeId + ", Название: " + request.getTitle() + ")",
+                username
+        );
+
         return ResponseEntity.ok("Информация о аниме сохранена");
     }
 
@@ -86,17 +131,28 @@ public class AnimeAdminController {
     @PostMapping("/upload-screenshots/{animeId}")
     public ResponseEntity<String> uploadScreenshots(
             @PathVariable Long animeId,
-            @RequestParam("files") List<MultipartFile> files
+            @RequestParam("files") List<MultipartFile> files,
+            Authentication authentication
     ) {
         if (files.size() > 8) {
             return ResponseEntity.badRequest().body("Максимум 7 скриншотов");
         }
 
+        String username = authentication != null ? authentication.getName() : "anonymous";
+
         for (MultipartFile file : files) {
             Long screenshotId = animeService.createScreenshotRecord(animeId);
             String filename = screenshotId + ".webp";
             s3Service.uploadFile("animes/" + animeId + "/screenshots/" + filename, file);
+
+            // лог по каждому
+            logService.log(
+                    "Загрузка скриншота",
+                    "Пользователь (" + username + ") загрузил скриншот (ID: " + screenshotId + ") для аниме (ID: " + animeId + ")",
+                    username
+            );
         }
+
         return ResponseEntity.ok("Скриншоты загружены");
     }
 
@@ -289,7 +345,8 @@ public class AnimeAdminController {
     @PostMapping("/upload-banner/{animeId}")
     public ResponseEntity<String> uploadBanner(
             @PathVariable Long animeId,
-            @RequestParam("file") MultipartFile file
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
     ) {
         Anime anime = animeRepository.findById(animeId)
                 .orElseThrow(() -> new RuntimeException("Аниме не найдено"));
@@ -307,6 +364,14 @@ public class AnimeAdminController {
             // 3. Загрузка файла (без учёта расширения оригинала — как .webp)
             s3Service.uploadFile(path, file);
 
+            // 🔷 Логирование
+            String username = authentication != null ? authentication.getName() : "anonymous";
+            logService.log(
+                    "Загрузка баннера",
+                    "Пользователь (" + username + ") загрузил баннер (ID: " + bannerId + ") для аниме (ID: " + animeId + ", Название: " + anime.getTitle() + ")",
+                    username
+            );
+
             return ResponseEntity.ok("✅ Баннер загружен как " + filename);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -314,12 +379,15 @@ public class AnimeAdminController {
         }
     }
 
+
     @PutMapping("/edit-info/{animeId}")
     public ResponseEntity<String> editAnimeInfo(
             @PathVariable Long animeId,
-            @RequestBody AnimeInfoRequest request
+            @RequestBody AnimeInfoRequest request,
+            Authentication authentication
     ) {
-        Anime anime = animeRepository.findById(animeId).orElseThrow(() -> new RuntimeException("Аниме не найдено"));
+        Anime anime = animeRepository.findById(animeId)
+                .orElseThrow(() -> new RuntimeException("Аниме не найдено"));
 
         anime.setTitle(request.getTitle());
         anime.setAlttitle(request.getAlttitle());
@@ -339,13 +407,24 @@ public class AnimeAdminController {
         anime.setKodik(request.getKodik());
 
         animeRepository.save(anime);
+
+        // 🔷 Логирование
+        String username = authentication != null ? authentication.getName() : "anonymous";
+        logService.log(
+                "Редактирование информации",
+                "Пользователь (" + username + ") отредактировал информацию о аниме (ID: " + animeId + ", Название: " + anime.getTitle() + ")",
+                username
+        );
+
         return ResponseEntity.ok("✅ Информация обновлена");
     }
+
 
     @PutMapping("/edit-cover/{animeId}")
     public ResponseEntity<String> editCover(
             @PathVariable Long animeId,
-            @RequestParam("file") MultipartFile file
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
     ) {
         Anime anime = animeRepository.findById(animeId).orElseThrow();
 
@@ -378,14 +457,24 @@ public class AnimeAdminController {
         anime.setCover(cover);
         animeRepository.save(anime);
 
+        // 🔷 Логирование
+        String username = authentication != null ? authentication.getName() : "anonymous";
+        logService.log(
+                "Редактирование обложки",
+                "Пользователь (" + username + ") обновил обложку (ID: " + cover.getId() + ") для аниме (ID: " + animeId + ", Название: " + anime.getTitle() + ")",
+                username
+        );
+
         return ResponseEntity.ok("✅ Обложка обновлена");
     }
+
 
 
     @PutMapping("/edit-banner/{animeId}")
     public ResponseEntity<String> editBanner(
             @PathVariable Long animeId,
-            @RequestParam("file") MultipartFile file
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
     ) {
         Anime anime = animeRepository.findById(animeId).orElseThrow();
 
@@ -418,15 +507,25 @@ public class AnimeAdminController {
         anime.setBanner(banner);
         animeRepository.save(anime);
 
+        // 🔷 Логирование
+        String username = authentication != null ? authentication.getName() : "anonymous";
+        logService.log(
+                "Редактирование баннера",
+                "Пользователь (" + username + ") обновил баннер (ID: " + banner.getId() + ") для аниме (ID: " + animeId + ", Название: " + anime.getTitle() + ")",
+                username
+        );
+
         return ResponseEntity.ok("✅ Баннер обновлён");
     }
+
 
 
     @PutMapping("/edit-screenshots/{animeId}")
     public ResponseEntity<String> editScreenshots(
             @PathVariable Long animeId,
             @RequestParam("files") List<MultipartFile> newFiles,
-            @RequestParam("keepIds") List<Long> keepIds // <-- Список ID, которые остаются
+            @RequestParam("keepIds") List<Long> keepIds,
+            Authentication authentication
     ) {
         Anime anime = animeRepository.findById(animeId).orElseThrow();
 
@@ -445,21 +544,36 @@ public class AnimeAdminController {
         screenshotsRepository.deleteAll(toRemove);
 
         // Загружаем новые
+        List<Long> newIds = new java.util.ArrayList<>();
         for (MultipartFile file : newFiles) {
             Screenshots shot = new Screenshots();
             shot.setAnime(anime);
             screenshotsRepository.save(shot);
 
+            newIds.add(shot.getId());
+
             String key = "animes/" + animeId + "/screenshots/" + shot.getId() + ".webp";
             s3Service.uploadFile(key, file);
         }
+
+        // 🔷 Логирование
+        String username = authentication != null ? authentication.getName() : "anonymous";
+        logService.log(
+                "Редактирование скриншотов",
+                "Пользователь (" + username + ") обновил скриншоты (ID'ы новых: " + newIds + ") для аниме (ID: " + animeId + ", Название: " + anime.getTitle() + ")",
+                username
+        );
 
         return ResponseEntity.ok("✅ Скриншоты обновлены");
     }
 
 
+
     @DeleteMapping("/delete-cover/{animeId}")
-    public ResponseEntity<String> deleteCover(@PathVariable Long animeId) {
+    public ResponseEntity<String> deleteCover(
+            @PathVariable Long animeId,
+            Authentication authentication
+    ) {
         Anime anime = animeRepository.findById(animeId)
                 .orElseThrow(() -> new RuntimeException("Аниме не найдено"));
 
@@ -476,13 +590,25 @@ public class AnimeAdminController {
 
             // 3. Удаляем из БД
             coverRepository.deleteById(coverId);
+
+            // 🔷 Логирование
+            String username = authentication != null ? authentication.getName() : "anonymous";
+            logService.log(
+                    "Удаление обложки",
+                    "Пользователь (" + username + ") удалил обложку (ID: " + coverId + ") для аниме (ID: " + animeId + ", Название: " + anime.getTitle() + ")",
+                    username
+            );
         }
 
         return ResponseEntity.ok("✅ Обложка удалена");
     }
 
+
     @DeleteMapping("/delete-banner/{animeId}")
-    public ResponseEntity<String> deleteBanner(@PathVariable Long animeId) {
+    public ResponseEntity<String> deleteBanner(
+            @PathVariable Long animeId,
+            Authentication authentication
+    ) {
         Anime anime = animeRepository.findById(animeId)
                 .orElseThrow(() -> new RuntimeException("Аниме не найдено"));
 
@@ -499,10 +625,17 @@ public class AnimeAdminController {
 
             // 3. Удаляем из БД
             bannerRepository.deleteById(bannerId);
+
+            // 🔷 Логирование
+            String username = authentication != null ? authentication.getName() : "anonymous";
+            logService.log(
+                    "Удаление баннера",
+                    "Пользователь (" + username + ") удалил баннер (ID: " + bannerId + ") для аниме (ID: " + animeId + ", Название: " + anime.getTitle() + ")",
+                    username
+            );
         }
 
         return ResponseEntity.ok("✅ Баннер удалён");
     }
-
 
 }

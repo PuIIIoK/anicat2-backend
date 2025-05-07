@@ -51,13 +51,12 @@ public class SecurityConfig {
                                 "/api/upload/**",
                                 "/api/auth/set-login/**",
                                 "/api/auth/set-login-id/**",
-                                "/api/admin/**",
                                 "/api/kinescope/**",
                                 "/api/libria/**",
                                 "/api/upload/profile/**",
                                 "/api/profiles/**"
                         ).permitAll()
-                        .requestMatchers("/api/auth/check", "/api/auth/get-role").authenticated()
+                        .requestMatchers("/api/auth/check", "/api/auth/get-role", "/api/admin/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
