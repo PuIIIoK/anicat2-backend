@@ -57,7 +57,8 @@ public class SecurityConfig {
                                 "/api/profiles/**",
                                 "/api/collection/**",
                                 "/api/payment/**",
-                                "/api/admin/update-category/**"
+                                "/api/admin/update-category/**",
+                                "/api/admin/users/**"
                         ).permitAll()
                         .requestMatchers("/api/auth/check", "/api/auth/get-role", "/api/admin/**").authenticated()
                         .anyRequest().authenticated()

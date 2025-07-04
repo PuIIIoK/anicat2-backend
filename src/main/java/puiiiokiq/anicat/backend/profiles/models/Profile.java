@@ -19,6 +19,8 @@ public class Profile {
     private String bannerId;
     private Boolean animePageBeta;   // ✅ добавляем сюда
     private Boolean profilePageBeta; // ✅ добавляем сюда
+    private Boolean banned;
+    private Boolean muted;
 
     @OneToOne
     @JsonIgnore

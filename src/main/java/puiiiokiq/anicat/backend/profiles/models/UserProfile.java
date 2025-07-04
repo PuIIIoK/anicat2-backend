@@ -17,6 +17,6 @@ public class UserProfile {
     private String bio;
     private String avatarId;
     private String bannerId;
-    private boolean animePageBeta;   // ✅ добавляем сюда
-    private boolean profilePageBeta; // ✅ добавляем сюда
+    private Boolean banned;
+    private Boolean muted;
 }

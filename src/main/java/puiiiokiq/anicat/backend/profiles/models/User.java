@@ -27,6 +27,12 @@ public class User {
     @Column(name = "balance")
     private Double balance;
 
+    @Column(name = "banned")
+    private Boolean banned = false;
+
+    @Column(name = "muted")
+    private Boolean muted = false;
+
     @Transient
     public List<Role> getRoles() {
         if (rolesString == null || rolesString.isBlank()) return List.of();
