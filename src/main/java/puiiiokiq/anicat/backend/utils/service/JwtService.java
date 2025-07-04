@@ -17,7 +17,7 @@ public class JwtService {
 
     private final SecretKey secretKey;
 
-    private final long EXPIRATION_TIME = 1000 * 60 * 60 * 24; // 24 часа
+    private final long EXPIRATION_TIME = 1000L * 60 * 60 * 24 * 7; // 7 дней
 
     public JwtService(@Value("${jwt.secret}") String secret) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));

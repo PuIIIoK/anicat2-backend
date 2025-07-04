@@ -25,6 +25,10 @@ public class AnimeCategoryController {
         response.put("categories", categories);
         return response;
     }
+    @GetMapping("/ping")
+    public ResponseEntity<String> ping() {
+        return ResponseEntity.ok("OK");
+    }
 
     @GetMapping("/get-category/{categoryId}")
     public ResponseEntity<?> getCategoryById(@PathVariable String categoryId) {

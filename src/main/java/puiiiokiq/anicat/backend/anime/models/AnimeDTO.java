@@ -1,10 +1,14 @@
 package puiiiokiq.anicat.backend.anime.models;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class AnimeDTO {
     private Long id;
     private String title;
@@ -24,27 +28,32 @@ public class AnimeDTO {
     private String alias;
     private String realesed_for;
     private String imageUrl;
+    private String zametka;
     private List<String> allowedCountries;
 
-    public AnimeDTO(Anime anime, String imageUrl) {
-        this.id = anime.getId();
-        this.title = anime.getTitle();
-        this.alttitle = anime.getAlttitle();
-        this.description = anime.getDescription();
-        this.genres = anime.getGenres();
-        this.status = anime.getStatus();
-        this.type = anime.getType();
-        this.episode_all = anime.getEpisodeAll();
-        this.current_episode = anime.getCurrentEpisode();
-        this.rating = anime.getRating();
-        this.year = anime.getYear();
-        this.season = anime.getSeason();
-        this.mouth_season = anime.getMouthSeason();
-        this.studio = anime.getStudio();
-        this.realesed_for = anime.getRealesedFor();
-        this.imageUrl = imageUrl;
-        this.kodik = anime.getKodik();
-        this.alias = anime.getAlias();
-        this.allowedCountries = anime.getAllowedCountries();
+
+    public static AnimeDTO from(Anime anime, String imageUrl) {
+        return new AnimeDTO(
+                anime.getId(),
+                anime.getTitle(),
+                anime.getAlttitle(),
+                anime.getDescription(),
+                anime.getGenres(),
+                anime.getStatus(),
+                anime.getType(),
+                anime.getEpisodeAll(),
+                anime.getCurrentEpisode(),
+                anime.getRating(),
+                anime.getYear(),
+                anime.getSeason(),
+                anime.getMouthSeason(),
+                anime.getStudio(),
+                anime.getKodik(),
+                anime.getAlias(),
+                anime.getRealesedFor(),
+                imageUrl,
+                anime.getZametka(),
+                anime.getAllowedCountries()
+        );
     }
 }

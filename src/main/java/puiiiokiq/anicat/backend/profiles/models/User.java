@@ -22,7 +22,10 @@ public class User {
     private String password;
 
     @Column(name = "roles")
-    private String rolesString; // хранится как строка в БД
+    private String rolesString;
+
+    @Column(name = "balance")
+    private Double balance;
 
     @Transient
     public List<Role> getRoles() {

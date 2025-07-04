@@ -19,9 +19,7 @@ public class AnimeCategory {
 
     private int position;
 
-    @ElementCollection
-    private List<String> animeIds;
-
-    // Геттеры и сеттеры
+    @ElementCollection(fetch = FetchType.EAGER)
+    private List<String> animeIds = new java.util.ArrayList<>();
 
 }

@@ -56,11 +56,13 @@ public class AnimeController {
                     if (anime.getCover() != null && anime.getCover().getId() != null) {
                         imageUrl = s3Service.generatePresignedCoverUrl(anime.getId(), anime.getCover().getId());
                     }
-                    AnimeDTO dto = new AnimeDTO(anime, imageUrl);
+
+                    AnimeDTO dto = AnimeDTO.from(anime, imageUrl);
                     return ResponseEntity.ok(dto);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
+
 
 
     @GetMapping("/get-anime/{id}/episodes")
@@ -180,11 +182,33 @@ public class AnimeController {
 
     @GetMapping("/get-anime/{animeId}/availability")
     public Map<String, Object> checkAnimeAvailability(@PathVariable Long animeId, HttpServletRequest request) {
-        boolean isAccessible = animeAccessService.isAnimeAccessible(animeId, request);
+        String clientIp = extractClientIp(request);
+        boolean isAccessible = animeAccessService.isAnimeAccessible(animeId, clientIp);
+
         Map<String, Object> response = new HashMap<>();
         response.put("accessible", isAccessible);
+        response.put("ip", clientIp); // показать IP для отладки (можно убрать)
+
         return response;
     }
+
+
+
+    private String extractClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+            return ip.split(",")[0].trim(); // берём первый IP в списке
+        }
+
+        ip = request.getHeader("X-Real-IP");
+        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+            return ip.trim();
+        }
+
+        return request.getRemoteAddr();
+    }
+
+
 
     @GetMapping("/get-anime/{animeId}/banner")
     public ResponseEntity<Map<String, Object>> getBannerIdByAnimeId(@PathVariable Long animeId) {

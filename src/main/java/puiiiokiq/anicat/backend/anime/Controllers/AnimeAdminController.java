@@ -15,6 +15,7 @@ import puiiiokiq.anicat.backend.anime.models.Anime;
 import puiiiokiq.anicat.backend.anime.models.Banner;
 import puiiiokiq.anicat.backend.anime.models.Cover;
 import puiiiokiq.anicat.backend.anime.models.Screenshots;
+import puiiiokiq.anicat.backend.category.AnimeCategory;
 import puiiiokiq.anicat.backend.utils.service.S3Service;
 import puiiiokiq.anicat.backend.episodes.models.Episode;
 import puiiiokiq.anicat.backend.episodes.models.Audio;
@@ -30,7 +31,8 @@ import puiiiokiq.anicat.backend.episodes.Repository.AudioRepository;
 import puiiiokiq.anicat.backend.anime.Repository.BannerRepository;
 import puiiiokiq.anicat.backend.anime.Repository.CoverRepository;
 import puiiiokiq.anicat.backend.anime.Repository.ScreenshotsRepository;
-
+import puiiiokiq.anicat.backend.category.AnimeCategoryRepository;
+import puiiiokiq.anicat.backend.category.AnimeCategory;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -46,7 +48,7 @@ public class AnimeAdminController {
     private final CoverRepository coverRepository;
     private final SiteLogService logService;
     private final ScreenshotsRepository screenshotsRepository;
-
+    private final AnimeCategoryRepository animeCategoryRepository;
 
 
     @PostMapping("/create-anime")
@@ -96,14 +98,6 @@ public class AnimeAdminController {
         String newFilename = coverId + ".webp";
         s3Service.uploadFile("animes/" + animeId + "/cover/" + newFilename, file);
 
-        // лог
-        String username = authentication != null ? authentication.getName() : "anonymous";
-        logService.log(
-                "Загрузка обложки",
-                "Пользователь (" + username + ") загрузил обложку (ID: " + coverId + ") для аниме (ID: " + animeId + ")",
-                username
-        );
-
         return ResponseEntity.ok("Обложка загружена");
     }
 
@@ -145,12 +139,6 @@ public class AnimeAdminController {
             String filename = screenshotId + ".webp";
             s3Service.uploadFile("animes/" + animeId + "/screenshots/" + filename, file);
 
-            // лог по каждому
-            logService.log(
-                    "Загрузка скриншота",
-                    "Пользователь (" + username + ") загрузил скриншот (ID: " + screenshotId + ") для аниме (ID: " + animeId + ")",
-                    username
-            );
         }
 
         return ResponseEntity.ok("Скриншоты загружены");
@@ -364,14 +352,6 @@ public class AnimeAdminController {
             // 3. Загрузка файла (без учёта расширения оригинала — как .webp)
             s3Service.uploadFile(path, file);
 
-            // 🔷 Логирование
-            String username = authentication != null ? authentication.getName() : "anonymous";
-            logService.log(
-                    "Загрузка баннера",
-                    "Пользователь (" + username + ") загрузил баннер (ID: " + bannerId + ") для аниме (ID: " + animeId + ", Название: " + anime.getTitle() + ")",
-                    username
-            );
-
             return ResponseEntity.ok("✅ Баннер загружен как " + filename);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -428,32 +408,32 @@ public class AnimeAdminController {
     ) {
         Anime anime = animeRepository.findById(animeId).orElseThrow();
 
-        // Удаление старой обложки (если есть)
+        // Проверяем, если существует уже обложка, удаляем её
         if (anime.getCover() != null) {
             Long oldId = anime.getCover().getId();
 
-            // 1. Убираем связь с cover
+            // Убираем связь с cover
             anime.setCover(null);
             animeRepository.save(anime);
 
-            // 2. Удаляем файл из S3
+            // Удаляем старую обложку из S3
             String oldKey = "animes/" + animeId + "/cover/" + oldId + ".webp";
             s3Service.deleteFile(oldKey);
 
-            // 3. Удаляем запись cover из базы
+            // Удаляем старую запись cover из базы
             coverRepository.deleteById(oldId);
         }
 
-        // 4. Создаём новую обложку
+        // Создаём новую обложку с новым ID
         Cover cover = new Cover();
         cover.setAnime(anime);
         coverRepository.save(cover);
 
-        // 5. Загружаем файл в S3
+        // Загружаем новый файл в S3 с новым ключом
         String newKey = "animes/" + animeId + "/cover/" + cover.getId() + ".webp";
         s3Service.uploadFile(newKey, file);
 
-        // 6. Привязываем обложку к аниме
+        // Привязываем новую обложку к аниме
         anime.setCover(cover);
         animeRepository.save(anime);
 
@@ -467,6 +447,8 @@ public class AnimeAdminController {
 
         return ResponseEntity.ok("✅ Обложка обновлена");
     }
+
+
 
 
 
@@ -494,6 +476,18 @@ public class AnimeAdminController {
             bannerRepository.deleteById(oldId);
         }
 
+        // Защита от дубликатов
+        List<Banner> existingBanners = bannerRepository.findByAnimeId(animeId);
+        for (Banner existingBanner : existingBanners) {
+            // Удаляем все дубликаты баннеров для того же аниме
+            if (!existingBanner.getId().equals(anime.getBanner() != null ? anime.getBanner().getId() : null)) {
+                bannerRepository.deleteById(existingBanner.getId());
+                // Удаление файла из S3 для дубликата
+                String duplicateKey = "animes/" + animeId + "/banner/" + existingBanner.getId() + ".webp";
+                s3Service.deleteFile(duplicateKey);
+            }
+        }
+
         // 4. Создаём новый баннер
         Banner banner = new Banner();
         banner.setAnime(anime);
@@ -517,6 +511,7 @@ public class AnimeAdminController {
 
         return ResponseEntity.ok("✅ Баннер обновлён");
     }
+
 
 
 
@@ -637,5 +632,30 @@ public class AnimeAdminController {
 
         return ResponseEntity.ok("✅ Баннер удалён");
     }
+
+    @PostMapping("/add-to-all-category/{animeId}")
+    public ResponseEntity<String> addToAllAnimeCategory(@PathVariable Long animeId, Authentication authentication) {
+        String categoryId = "2";
+        AnimeCategory category = animeCategoryRepository.findById(categoryId)
+                .orElseThrow(() -> new RuntimeException("Категория 'все аниме' не найдена"));
+
+        List<String> animeIdStrings = category.getAnimeIds();
+        if (!animeIdStrings.contains(animeId.toString())) {
+            animeIdStrings.add(animeId.toString());
+            category.setAnimeIds(animeIdStrings);
+            animeCategoryRepository.save(category);
+        }
+
+        // логирование
+        String username = authentication != null ? authentication.getName() : "anonymous";
+        logService.log(
+                "Добавление в категорию",
+                "Пользователь (" + username + ") добавил аниме (ID: " + animeId + ") в категорию 'все аниме'",
+                username
+        );
+
+        return ResponseEntity.ok("✅ Аниме добавлено в категорию 'все аниме'");
+    }
+
 
 }

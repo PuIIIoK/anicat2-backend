@@ -54,7 +54,10 @@ public class SecurityConfig {
                                 "/api/kinescope/**",
                                 "/api/libria/**",
                                 "/api/upload/profile/**",
-                                "/api/profiles/**"
+                                "/api/profiles/**",
+                                "/api/collection/**",
+                                "/api/payment/**",
+                                "/api/admin/update-category/**"
                         ).permitAll()
                         .requestMatchers("/api/auth/check", "/api/auth/get-role", "/api/admin/**").authenticated()
                         .anyRequest().authenticated()

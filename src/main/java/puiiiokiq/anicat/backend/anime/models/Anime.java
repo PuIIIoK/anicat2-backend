@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import puiiiokiq.anicat.backend.collections.models.AnimeCollection;
 import puiiiokiq.anicat.backend.episodes.models.Episode;
 
 import java.util.List;
@@ -37,6 +38,7 @@ public class Anime {
     private String realesed_for;
     private String alias;
     private String kodik;
+    private String zametka;
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "anime_not_allowed_countries", joinColumns = @JoinColumn(name = "anime_id"))
