@@ -89,30 +89,43 @@ public class AuthController {
                 profile.getBio(),
                 profile.getAvatarId(),
                 profile.getBannerId(),
-                Boolean.TRUE.equals(profile.getAnimePageBeta()),
-                Boolean.TRUE.equals(profile.getProfilePageBeta())
+                Boolean.TRUE.equals(user.getBanned()),
+                Boolean.TRUE.equals(user.getMuted())
         );
 
     }
 
-    @GetMapping("/get-profile/{id}")
-    public UserProfile getProfileById(@PathVariable Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+    @GetMapping("/get-profile/id")
+    public ResponseEntity<?> getProfile(@RequestParam(required = false) Long id,
+                                        @RequestParam(required = false) String username) {
+        User user;
+
+        if (id != null) {
+            user = userRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Пользователь с ID не найден"));
+        } else if (username != null) {
+            user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("Пользователь с таким username не найден"));
+        } else {
+            return ResponseEntity.badRequest().body("Нужно указать id или username");
+        }
+
         Profile profile = user.getProfile();
 
-        return new UserProfile(
+        UserProfile result = new UserProfile(
                 user.getId(),
                 user.getUsername(),
                 user.getRoles().stream().map(Enum::name).toArray(String[]::new),
                 profile.getId(),
                 profile.getNickname(),
                 profile.getBio(),
-                profile.getAvatarId(),
-                profile.getBannerId(),
-                Boolean.TRUE.equals(profile.getAnimePageBeta()),
-                Boolean.TRUE.equals(profile.getProfilePageBeta())
+                profile.getAvatarId() != null ? profile.getAvatarId().toString() : null,
+                profile.getBannerId() != null ? profile.getBannerId().toString() : null,
+                Boolean.TRUE.equals(user.getBanned()),
+                Boolean.TRUE.equals(user.getMuted())
         );
+
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/set-profile")

@@ -144,10 +144,10 @@ public class AnimeSearchController {
         String avatarUrl = getPresignedUrl(avatarId, "cover");
         String bannerUrl = getPresignedUrl(bannerId, "banner");
 
-        return ResponseEntity.ok(Map.of(
-                "avatarUrl", avatarUrl,
-                "bannerUrl", bannerUrl
-        ));
+        Map<String, Object> result = new HashMap<>();
+        result.put("avatarUrl", avatarUrl);
+        result.put("bannerUrl", bannerUrl);
+        return ResponseEntity.ok(result);
     }
 
     private Optional<Profile> findProfile(Long id, String nickname, String username) {

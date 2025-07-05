@@ -19,4 +19,20 @@ public class UserProfile {
     private String bannerId;
     private Boolean banned;
     private Boolean muted;
+
+    public UserProfile(Long userId, String username, String[] roles,
+                       Long profileId, String nickname, String bio,
+                       String avatarId, String bannerId,
+                       boolean banned, boolean muted) {
+        this.userId = userId;
+        this.username = username;
+        this.roles = roles;
+        this.profileId = profileId;
+        this.nickname = nickname;
+        this.bio = bio;
+        this.avatarId = avatarId;
+        this.bannerId = bannerId;
+        this.banned = banned;
+        this.muted = muted;
+    }
 }
